@@ -1,0 +1,4 @@
+{
+  "description": "This is an example of how to use ama-react with a basic component",
+  "include": ["examples/**/*.tsx", "examples/**/*.ts"]
+}

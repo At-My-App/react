@@ -1,0 +1,23 @@
+{
+  "description": "This is an example of how to use ama-react with a basic component",
+  "definitions": {
+    "landing/content.json": {
+      "structure": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "image": {
+            "$ref": "#/$defs/AmaImageDef"
+          }
+        },
+        "required": ["title", "description", "image"]
+      }
+    }
+  },
+  "args": []
+}

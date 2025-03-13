@@ -1,0 +1,28 @@
+
+# AMA configuration
+.ama/
+
+# Node modules
+node_modules/
+
+# Environment variables
+.env
+
+# history
+.history/
+
+# logs
+logs/
+
+# temp
+temp/
+
+# dist
+dist/
+
+# build
+build/
+
+
+
+
