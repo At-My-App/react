@@ -1,11 +1,29 @@
 {
-  "name": "@at-my-app/react-client",
+  "name": "@atmyapp/react",
+  "description": "React client for At My App",
+  "license": "MIT",
   "version": "1.0.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
     "ama": "./dist/cli/index.js"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/At-My-App/react.git"
+  },
+  "keywords": [
+    "react",
+    "typescript",
+    "cli"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "clean": "rmdir /s /q dist",
     "prebuild": "npm run clean",
@@ -15,7 +33,6 @@
     "test:migrate": "node ./dist/cli/test-migrate.js"
   },
   "dependencies": {
-    "@at-my-app/react-client": "file:",
     "chalk": "^4.1.2",
     "commander": "^9.5.0",
     "fast-glob": "^3.3.3",
