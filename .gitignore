@@ -26,3 +26,6 @@ build/
 
 
 
+
+# AMA configuration
+.ama/session.json

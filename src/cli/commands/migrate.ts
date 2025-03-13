@@ -242,6 +242,24 @@ function generateOutput(contents: Content[], config: any): OutputDefinition {
   };
 }
 
+async function getFetchImplementation(): Promise<typeof fetch> {
+  // Use native fetch if available (Node.js 18+)
+  if (typeof globalThis.fetch === "function") {
+    return globalThis.fetch.bind(globalThis);
+  }
+
+  // Fallback to node-fetch for older Node.js versions
+  try {
+    // @ts-ignore
+    const nodeFetch = await import("node-fetch");
+    return nodeFetch.default as unknown as typeof fetch;
+  } catch (error) {
+    throw new Error(
+      "Neither native fetch nor node-fetch is available. For Node.js < 18, install node-fetch package."
+    );
+  }
+}
+
 // Main migrate command function
 export function migrateCommand(): Command {
   return new Command("migrate")
@@ -283,6 +301,47 @@ export function migrateCommand(): Command {
         console.log(
           chalk.green("🚀 Successfully generated ama_definitions.json")
         );
+
+        if (!(config as any).url) {
+          console.error(
+            chalk.red(
+              "Base URL not provided in session. Please run 'use' command first."
+            )
+          );
+          process.exit(1);
+        }
+
+        try {
+          const fetchApi = await getFetchImplementation();
+          const url = `${(config as any).url}/storage/structure`;
+
+          console.log(chalk.blue(`🔄 Posting definitions to server`));
+
+          const response = await fetchApi(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${(config as any).token}`,
+            },
+            body: JSON.stringify({ content: output }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          console.log(
+            chalk.green("🚀 Successfully posted definitions to storage.")
+          );
+        } catch (postError) {
+          console.error(
+            chalk.red(
+              `❌ Failed to post definitions: ${
+                postError instanceof Error ? postError.message : postError
+              }`
+            )
+          );
+          console.log(postError);
+        }
       } catch (error: unknown) {
         const message =
           error instanceof Error ? error.message : "Unknown error";
