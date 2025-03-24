@@ -2,10 +2,15 @@ import { Command } from "commander";
 import chalk from "chalk";
 import { getConfig } from "../utils/config";
 import fg from "fast-glob";
-import { Project, SourceFile, TypeAliasDeclaration } from "ts-morph";
+import {
+  Project,
+  SourceFile,
+  TypeAliasDeclaration,
+  ProjectOptions,
+} from "ts-morph";
 import * as ts from "typescript";
 import { resolve } from "path";
-import { generateSchema } from "typescript-json-schema";
+import { generateSchema, getProgramFromFiles } from "typescript-json-schema";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 
 // Types for better code organization
@@ -18,6 +23,13 @@ interface OutputDefinition {
   description: string;
   definitions: Record<string, { structure: any }>;
   args: any[];
+}
+
+interface MigrateOptions {
+  dryRun: boolean;
+  verbose: boolean;
+  tsconfig: string;
+  continueOnError: boolean;
 }
 
 /**
@@ -125,53 +137,145 @@ export function processSpecialTypes(schema: any): any {
   return result;
 }
 
+/**
+ * Logger utility to handle verbose logging
+ */
+class Logger {
+  private verbose: boolean;
+
+  constructor(verbose: boolean) {
+    this.verbose = verbose;
+  }
+
+  info(message: string): void {
+    console.log(chalk.blue(message));
+  }
+
+  success(message: string): void {
+    console.log(chalk.green(message));
+  }
+
+  error(message: string, error?: unknown): void {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(chalk.red(message), error ? chalk.red(errorMessage) : "");
+  }
+
+  verbose_log(message: string): void {
+    if (this.verbose) {
+      console.log(chalk.cyan(`[VERBOSE] ${message}`));
+    }
+  }
+
+  warn(message: string): void {
+    console.warn(chalk.yellow(message));
+  }
+}
+
 // Scans for TypeScript files based on config patterns
-async function scanFiles(patterns: string[]): Promise<string[]> {
-  console.log(chalk.blue("🔍 Scanning files..."));
-  return fg(patterns, {
+async function scanFiles(
+  patterns: string[],
+  logger: Logger
+): Promise<string[]> {
+  logger.info("🔍 Scanning files...");
+  logger.verbose_log(`Using patterns: ${patterns.join(", ")}`);
+
+  const files = await fg(patterns, {
     ignore: ["**/node_modules/**", "**/test/**", "**/dist/**"],
     absolute: true,
     cwd: process.cwd(),
   });
+
+  logger.verbose_log(`Found ${files.length} files matching patterns`);
+  return files;
 }
 
 // Creates and configures the TypeScript project
-function createProject(files: string[]): Project {
-  const project = new Project({
-    tsConfigFilePath: resolve(process.cwd(), "tsconfig.json"),
-  });
+function createProject(
+  files: string[],
+  tsconfigPath: string,
+  logger: Logger
+): Project {
+  const resolvedTsConfigPath = resolve(process.cwd(), tsconfigPath);
+
+  if (!existsSync(resolvedTsConfigPath)) {
+    logger.warn(
+      `tsconfig at ${resolvedTsConfigPath} not found, using default compiler options`
+    );
+  } else {
+    logger.verbose_log(`Using tsconfig from ${resolvedTsConfigPath}`);
+  }
+
+  const projectOptions: ProjectOptions = {
+    tsConfigFilePath: existsSync(resolvedTsConfigPath)
+      ? resolvedTsConfigPath
+      : undefined,
+    skipAddingFilesFromTsConfig: true,
+    compilerOptions: !existsSync(resolvedTsConfigPath)
+      ? {
+          target: ts.ScriptTarget.ESNext,
+          module: ts.ModuleKind.ESNext,
+          moduleResolution: ts.ModuleResolutionKind.NodeJs,
+          esModuleInterop: true,
+          jsx: ts.JsxEmit.React,
+          skipLibCheck: true,
+        }
+      : undefined,
+  };
+
+  logger.verbose_log("Creating ts-morph Project");
+  const project = new Project(projectOptions);
+
+  logger.verbose_log(`Adding ${files.length} source files to project`);
   project.addSourceFilesAtPaths(files);
+
   return project;
 }
 
 // Processes a single type alias to extract content information
 function processTypeAlias(
   alias: TypeAliasDeclaration,
-  file: SourceFile
+  file: SourceFile,
+  tsconfigPath: string,
+  logger: Logger
 ): Content | null {
-  if (!alias.getName().startsWith("_AMA_")) {
+  const aliasName = alias.getName();
+
+  if (!aliasName.startsWith("_AMA_")) {
+    logger.verbose_log(`Skipping non-AMA type: ${aliasName}`);
     return null;
   }
 
-  const program = ts.createProgram([file.getFilePath()], {
-    target: ts.ScriptTarget.ES2015,
-    module: ts.ModuleKind.ESNext,
-    strict: true,
-    esModuleInterop: true,
-    skipLibCheck: true,
-    jsx: ts.JsxEmit.Preserve,
-  });
+  logger.verbose_log(
+    `Processing AMA type: ${aliasName} in ${file.getFilePath()}`
+  );
 
-  const schema = generateSchema(program as any, alias.getName(), {
+  const resolvedTsConfigPath = resolve(process.cwd(), tsconfigPath);
+  const compilerOptions = existsSync(resolvedTsConfigPath)
+    ? { configFile: resolvedTsConfigPath }
+    : {
+        target: ts.ScriptTarget.ES2015,
+        module: ts.ModuleKind.ESNext,
+        strict: true,
+        esModuleInterop: true,
+        skipLibCheck: true,
+        jsx: ts.JsxEmit.Preserve,
+      };
+
+  const program = getProgramFromFiles([file.getFilePath()], compilerOptions);
+
+  logger.verbose_log(`Generating schema for ${aliasName}`);
+  const schema = generateSchema(program, aliasName, {
     required: true,
     noExtraProps: true,
     aliasRef: true,
     ref: false,
     defaultNumberType: "number",
+    ignoreErrors: true,
+    skipLibCheck: true,
   });
 
   if (!schema) {
-    throw new Error(`Failed to generate schema for ${alias.getName()}`);
+    throw new Error(`Failed to generate schema for ${aliasName}`);
   }
 
   const pathMatch = alias
@@ -179,14 +283,16 @@ function processTypeAlias(
     .getText()
     .match(/["'](.*?)["']/);
   if (!pathMatch?.[1]) {
-    throw new Error(`Missing file path in ${alias.getName()}`);
+    throw new Error(`Missing file path in ${aliasName}`);
   }
 
   if (!schema.properties) {
-    throw new Error(`Invalid schema structure in ${alias.getName()}`);
+    throw new Error(`Invalid schema structure in ${aliasName}`);
   }
 
   const internal = schema.properties as any;
+
+  logger.verbose_log(`Successfully extracted content from ${aliasName}`);
   return {
     path: internal["path"]["const"] as string,
     structure: internal["structure"] || internal["config"],
@@ -194,41 +300,75 @@ function processTypeAlias(
 }
 
 // Processes all files to extract contents
-function processFiles(sourceFiles: SourceFile[]): {
+function processFiles(
+  sourceFiles: SourceFile[],
+  tsconfigPath: string,
+  continueOnError: boolean,
+  logger: Logger
+): {
   contents: Content[];
   errors: string[];
+  successCount: number;
+  failureCount: number;
 } {
   const contents: Content[] = [];
   const errors: string[] = [];
+  let successCount = 0;
+  let failureCount = 0;
+
+  logger.info(`📚 Processing ${sourceFiles.length} source files...`);
 
   sourceFiles.forEach((file) => {
-    file.getTypeAliases().forEach((alias) => {
+    logger.verbose_log(`Examining file: ${file.getFilePath()}`);
+    const aliases = file.getTypeAliases();
+    logger.verbose_log(
+      `Found ${aliases.length} type aliases in ${file.getFilePath()}`
+    );
+
+    aliases.forEach((alias) => {
       try {
-        const content = processTypeAlias(alias, file);
+        const content = processTypeAlias(alias, file, tsconfigPath, logger);
         if (content) {
           contents.push(content);
+          successCount++;
+          logger.verbose_log(`Successfully processed ${alias.getName()}`);
         }
       } catch (err) {
-        errors.push(
-          `❌ ${file.getFilePath()} - ${
-            err instanceof Error ? err.message : "Unknown error"
-          }`
-        );
+        failureCount++;
+        const errorMessage = `❌ ${file.getFilePath()} - ${alias.getName()} - ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`;
+        errors.push(errorMessage);
+        logger.error(errorMessage);
+
+        if (!continueOnError) {
+          throw err;
+        }
       }
     });
   });
 
-  return { contents, errors };
+  return { contents, errors, successCount, failureCount };
 }
 
 // Generates the final output definition
-function generateOutput(contents: Content[], config: any): OutputDefinition {
-  // Process each content to transform special types
-  const processedContents = contents.map((content) => ({
-    ...content,
-    structure: processSpecialTypes(content.structure),
-  }));
+function generateOutput(
+  contents: Content[],
+  config: any,
+  logger: Logger
+): OutputDefinition {
+  logger.verbose_log("Processing contents and transforming special types");
 
+  // Process each content to transform special types
+  const processedContents = contents.map((content) => {
+    logger.verbose_log(`Transforming special types for path: ${content.path}`);
+    return {
+      ...content,
+      structure: processSpecialTypes(content.structure),
+    };
+  });
+
+  logger.verbose_log("Generating final output definition");
   return {
     description: config.description || "AMA Definitions",
     definitions: processedContents.reduce(
@@ -260,92 +400,158 @@ async function getFetchImplementation(): Promise<typeof fetch> {
   }
 }
 
+// Uploads the generated definitions to the AtMyApp platform
+async function uploadDefinitions(
+  output: OutputDefinition,
+  config: any,
+  logger: Logger
+): Promise<boolean> {
+  if (!(config as any).url) {
+    logger.error(
+      "Base URL not provided in session. Please run 'use' command first."
+    );
+    return false;
+  }
+
+  try {
+    const fetchApi = await getFetchImplementation();
+    const url = `${(config as any).url}/storage/structure`;
+
+    logger.info(`🔄 Posting definitions to server at ${url}`);
+
+    const response = await fetchApi(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${(config as any).token}`,
+      },
+      body: JSON.stringify({ content: output }),
+    });
+
+    if (!response.ok) {
+      const responseText = await response.text();
+      logger.verbose_log(`Server response: ${responseText}`);
+      throw new Error(
+        `HTTP error! status: ${response.status}, message: ${responseText}`
+      );
+    }
+
+    logger.success("🚀 Successfully posted definitions to storage.");
+    return true;
+  } catch (postError) {
+    logger.error("❌ Failed to post definitions:", postError);
+    return false;
+  }
+}
+
+// Ensures the .ama directory exists
+function ensureAmaDirectory(logger: Logger): void {
+  const amaDir = "./.ama";
+  if (!existsSync(amaDir)) {
+    logger.verbose_log(
+      `Creating .ama directory at ${resolve(process.cwd(), amaDir)}`
+    );
+    mkdirSync(amaDir, { recursive: true });
+  } else {
+    logger.verbose_log(
+      `.ama directory already exists at ${resolve(process.cwd(), amaDir)}`
+    );
+  }
+}
+
+// Saves the output definition to a local file
+function saveOutputToFile(output: OutputDefinition, logger: Logger): void {
+  const outputPath = "./.ama/definitions.json";
+  logger.verbose_log(
+    `Saving definitions to ${resolve(process.cwd(), outputPath)}`
+  );
+  writeFileSync(outputPath, JSON.stringify(output, null, 2));
+  logger.success(`✅ Successfully generated ${outputPath}`);
+}
+
 // Main migrate command function
 export function migrateCommand(): Command {
   return new Command("migrate")
     .description("Migrate definitions to AtMyApp platform")
-    .action(async () => {
+    .option(
+      "--dry-run",
+      "Generate definitions without uploading to server",
+      false
+    )
+    .option("--verbose", "Enable verbose logging", false)
+    .option("--tsconfig <path>", "Path to tsconfig.json", "tsconfig.json")
+    .option(
+      "--continue-on-error",
+      "Continue processing even if some files fail",
+      false
+    )
+    .action(async (options: MigrateOptions) => {
+      const logger = new Logger(options.verbose);
+
       try {
+        logger.info("🚀 Starting migration process");
+        logger.verbose_log(`Options: ${JSON.stringify(options)}`);
+
         const config = getConfig();
         const patterns = config.include || ["**/*.ts", "**/*.tsx"];
 
         // Create .ama directory if it doesn't exist
-        const amaDir = "./.ama";
-        if (!existsSync(amaDir)) {
-          mkdirSync(amaDir, { recursive: true });
-        }
+        ensureAmaDirectory(logger);
 
         // Execute migration steps
-        const files = await scanFiles(patterns);
-        console.log(chalk.blue(`📚 Processing ${files.length} files...`));
+        const files = await scanFiles(patterns, logger);
+        logger.info(`📚 Found ${files.length} files to process`);
 
-        const project = createProject(files);
-        const { contents, errors } = processFiles(project.getSourceFiles());
+        const project = createProject(files, options.tsconfig, logger);
+        const { contents, errors, successCount, failureCount } = processFiles(
+          project.getSourceFiles(),
+          options.tsconfig,
+          options.continueOnError,
+          logger
+        );
 
-        // Handle errors if any
-        if (errors.length > 0) {
-          console.error(chalk.red("Validation failed:\n" + errors.join("\n")));
-          process.exit(1);
+        // Report processing results
+        logger.success(
+          `✅ Successfully processed ${successCount} AMA contents`
+        );
+
+        if (failureCount > 0) {
+          logger.warn(`⚠️ Failed to process ${failureCount} items`);
+          if (options.verbose && errors.length > 0) {
+            logger.info("Errors encountered:");
+            errors.forEach((err) => logger.error(`  ${err}`));
+          }
         }
 
-        console.log(
-          chalk.green(`✅ Found ${contents.length} valid AMA contents`)
-        );
+        if (contents.length === 0) {
+          logger.error("No valid AMA contents found. Exiting.");
+          process.exit(1);
+        }
 
         // Generate and save output
-        const output = generateOutput(contents, config);
-        writeFileSync(
-          "./.ama/definitions.json",
-          JSON.stringify(output, null, 2)
-        );
-        console.log(
-          chalk.green("🚀 Successfully generated ama_definitions.json")
-        );
+        const output = generateOutput(contents, config, logger);
+        saveOutputToFile(output, logger);
 
-        if (!(config as any).url) {
-          console.error(
-            chalk.red(
-              "Base URL not provided in session. Please run 'use' command first."
-            )
-          );
-          process.exit(1);
-        }
+        // Upload definitions unless dry-run is enabled
+        if (!options.dryRun) {
+          logger.info("Uploading definitions to AtMyApp platform");
+          const uploadSuccess = await uploadDefinitions(output, config, logger);
 
-        try {
-          const fetchApi = await getFetchImplementation();
-          const url = `${(config as any).url}/storage/structure`;
-
-          console.log(chalk.blue(`🔄 Posting definitions to server`));
-
-          const response = await fetchApi(url, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${(config as any).token}`,
-            },
-            body: JSON.stringify({ content: output }),
-          });
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+          if (!uploadSuccess) {
+            logger.warn(
+              "Upload failed, but definitions were generated successfully"
+            );
+            process.exit(1);
           }
-          console.log(
-            chalk.green("🚀 Successfully posted definitions to storage.")
-          );
-        } catch (postError) {
-          console.error(
-            chalk.red(
-              `❌ Failed to post definitions: ${
-                postError instanceof Error ? postError.message : postError
-              }`
-            )
-          );
-          console.log(postError);
+        } else {
+          logger.info("Dry run mode enabled. Skipping upload to server.");
         }
+
+        logger.success("Migration completed successfully");
       } catch (error: unknown) {
         const message =
           error instanceof Error ? error.message : "Unknown error";
-        console.error(chalk.red(`Error: ${message}`));
+        logger.error(`Fatal error: ${message}`, error);
         process.exit(1);
       }
     });
