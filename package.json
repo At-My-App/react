@@ -2,7 +2,7 @@
   "name": "@atmyapp/react",
   "description": "React client for At My App",
   "license": "MIT",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {

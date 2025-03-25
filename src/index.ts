@@ -26,3 +26,8 @@ export {
   injectComponentData,
 } from "./utils/componentInterop";
 export { createAmaUrl, amaFetch, getContentType } from "./utils/amaFetch";
+
+export * from "./context/AmaProvider";
+export * from "./types/AmaContent";
+export * from "./types/AmaFile";
+export * from "./types/AmaImage";
