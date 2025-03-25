@@ -17,6 +17,7 @@ import { writeFileSync, mkdirSync, existsSync } from "fs";
 interface Content {
   path: string;
   structure: any;
+  type?: string;
 }
 
 interface OutputDefinition {
@@ -351,6 +352,25 @@ function processFiles(
   return { contents, errors, successCount, failureCount };
 }
 
+// Determines the content type based on its structure and path
+function determineContentType(content: Content): string {
+  // Extract file extension
+  const fileExt = content.path.split(".").pop()?.toLowerCase();
+
+  // Check for image types based on structure or extension
+  if (content.structure?.__amatype === "AmaImageDef") {
+    return "image";
+  }
+
+  // Check for file types
+  if (content.structure?.__amatype === "AmaFileDef") {
+    return "file";
+  }
+
+  // Default type for other content
+  return "jsonx";
+}
+
 // Generates the final output definition
 function generateOutput(
   contents: Content[],
@@ -365,6 +385,7 @@ function generateOutput(
     return {
       ...content,
       structure: processSpecialTypes(content.structure),
+      type: determineContentType(content),
     };
   });
 
@@ -374,7 +395,10 @@ function generateOutput(
     definitions: processedContents.reduce(
       (acc, curr) => ({
         ...acc,
-        [curr.path]: { structure: curr.structure },
+        [curr.path]: {
+          type: curr.type,
+          structure: curr.structure,
+        },
       }),
       {}
     ),
@@ -425,12 +449,12 @@ async function uploadDefinitions(
         "Content-Type": "application/json",
         Authorization: `Bearer ${(config as any).token}`,
       },
-      body: JSON.stringify({ content: output }),
+      body: JSON.stringify({ content: JSON.stringify(output) }),
     });
+    const responseText = await response.text();
+    logger.verbose_log(`Server response: ${responseText}`);
 
     if (!response.ok) {
-      const responseText = await response.text();
-      logger.verbose_log(`Server response: ${responseText}`);
       throw new Error(
         `HTTP error! status: ${response.status}, message: ${responseText}`
       );

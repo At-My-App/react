@@ -134,6 +134,17 @@ export const getContentType = (
       return "application/pdf";
     case "json":
       return "application/json";
+    case "html":
+    case "htm":
+      return "text/html";
+    case "xml":
+      return "application/xml";
+    case "css":
+      return "text/css";
+    case "js":
+      return "application/javascript";
+    case "txt":
+      return "text/plain";
     default:
       return "application/octet-stream";
   }
