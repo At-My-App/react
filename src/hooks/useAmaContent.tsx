@@ -23,18 +23,33 @@ interface AmaContentHook<T extends AmaContentRef<string, unknown>> {
  *
  * @template T - Content reference type
  * @param path - The content path
+ * @param atmyAppConfig - Optional configuration object from createAtMyApp
  * @returns Object containing the parsed content data, loading state, and errors
  */
 export function useAmaContent<T extends AmaContentRef<string, unknown>>(
-  path: T["path"]
+  path: T["path"],
+  atmyAppConfig?: ReturnType<typeof import("../createAtMyApp").createAtMyApp>
 ): AmaContentHook<T> {
-  const context = useAmaContext();
+  // Use provided config or get from context
+  let config: {
+    apiKey: string;
+    projectUrl: string;
+    cache: Map<string, any>;
+  };
 
-  if (!context) {
-    throw new Error("useAmaContent must be used within an AmaProvider");
+  if (atmyAppConfig) {
+    config = atmyAppConfig;
+  } else {
+    const context = useAmaContext();
+    if (!context) {
+      throw new Error(
+        "useAmaContent must be used within an AmaProvider or provide a configuration"
+      );
+    }
+    config = context;
   }
 
-  const { apiKey, projectUrl, cache } = context;
+  const { apiKey, projectUrl, cache } = config;
 
   // Using unknown type for data since it will be cast to the correct type in the return
   const [data, setData] = useState<unknown>(null);

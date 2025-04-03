@@ -12,6 +12,7 @@ A comprehensive React library for integrating with the AtMyApp CMS platform, pro
 - 🔒 **Security**: Built-in HTML sanitization for safely embedding third-party content
 - 💾 **Smart Caching**: Efficient caching for improved performance
 - 📱 **TypeScript Support**: Fully typed API for better developer experience
+- 🛠️ **CLI Tools**: Migration and authentication utilities
 
 ## Installation
 
@@ -21,7 +22,11 @@ npm install @atmyapp/react-package
 
 ## Setup
 
-Wrap your application with the `AmaProvider` to set up configuration:
+AtMyApp can be set up in two ways: using a Provider for your entire application, or using direct configuration for more targeted usage.
+
+### Method 1: Provider Pattern
+
+Wrap your application with the `AmaProvider` to set up configuration once at the application level:
 
 ```tsx
 import { AmaProvider } from "@atmyapp/react-package";
@@ -37,6 +42,30 @@ function App() {
   );
 }
 ```
+
+### Method 2: Direct Configuration (Without Provider)
+
+Create a configuration object that can be passed directly to hooks:
+
+```tsx
+import { createAtMyApp } from "@atmyapp/react-package";
+
+// Create the configuration object
+const atmyapp = createAtMyApp({
+  apiKey: "your-api-key",
+  projectUrl: "https://your-project.atmyapp.com",
+  defaultCacheDuration: 3600, // optional, in seconds
+});
+
+// Export it for use throughout your application
+export default atmyapp;
+```
+
+This approach is ideal for:
+
+- Using AtMyApp in isolated parts of your application
+- Working in a component library where adding context may be challenging
+- Having more control over configuration per-component
 
 ## Type System
 
@@ -126,6 +155,8 @@ export type CustomFile = AmaFileRef<
 
 ## Hooks
 
+All hooks can be used either with the Provider pattern or with direct configuration.
+
 ### `useAmaContent`
 
 Fetches JSON content from the CMS:
@@ -135,9 +166,16 @@ import { useAmaContent } from "@atmyapp/react-package";
 import { HomepageContent } from "./types";
 
 function HomePage() {
+  // With Provider
   const { data, isLoading, error } = useAmaContent<HomepageContent>(
     "homepage/content.json"
   );
+
+  // Or with direct configuration
+  // const { data, isLoading, error } = useAmaContent<HomepageContent>(
+  //   "homepage/content.json",
+  //   atmyapp
+  // );
 
   if (isLoading) return <div>Loading...</div>;
   if (error) return <div>Error loading content</div>;
@@ -166,8 +204,11 @@ import { useAmaImage } from "@atmyapp/react-package";
 import { LogoImage, HeroImage } from "./types";
 
 function ImageExample() {
-  // Basic usage
+  // Basic usage with Provider
   const logo = useAmaImage<LogoImage>("images/logo.png");
+
+  // Or with direct configuration
+  // const logo = useAmaImage<LogoImage>("images/logo.png", atmyapp);
 
   // With type safety from a reference
   const hero = useAmaImage<HeroImage>("images/hero.jpg");
@@ -192,19 +233,47 @@ import { useAmaFile } from "@atmyapp/react-package";
 import { PdfDocument } from "./types";
 
 function FileExample() {
-  const { url, download, isLoading, error } = useAmaFile<PdfDocument>(
+  // With Provider
+  const { data, isLoading, error } = useAmaFile<PdfDocument>(
     "documents/guide.pdf"
   );
+
+  // Or with direct configuration
+  // const { data, isLoading, error } = useAmaFile<PdfDocument>(
+  //   "documents/guide.pdf",
+  //   atmyapp
+  // );
 
   if (isLoading) return <div>Loading file...</div>;
   if (error) return <div>Error loading file</div>;
 
   return (
     <div>
-      <a href={url} target="_blank" rel="noopener noreferrer">
+      <a
+        href={URL.createObjectURL(
+          new Blob([data], { type: "application/pdf" })
+        )}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
         View Document
       </a>
-      <button onClick={() => download("user-guide.pdf")}>Download PDF</button>
+      <button
+        onClick={() => {
+          const url = URL.createObjectURL(
+            new Blob([data], { type: "application/pdf" })
+          );
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "user-guide.pdf";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }}
+      >
+        Download PDF
+      </button>
     </div>
   );
 }
@@ -219,6 +288,7 @@ import { useAmaComponent } from "@atmyapp/react-package";
 import { HeaderComponent } from "./types";
 
 function ComponentExample() {
+  // With Provider
   const { html, isLoading, error } = useAmaComponent<HeaderComponent>(
     "components/header.html",
     {
@@ -226,6 +296,16 @@ function ComponentExample() {
       cacheDuration: 3600, // 1 hour in seconds
     }
   );
+
+  // Or with direct configuration
+  // const { html, isLoading, error } = useAmaComponent<HeaderComponent>(
+  //   "components/header.html",
+  //   {
+  //     sanitize: true,
+  //     cacheDuration: 3600,
+  //   },
+  //   atmyapp
+  // );
 
   if (isLoading) return <div>Loading component...</div>;
   if (error) return <div>Error loading component</div>;
@@ -615,6 +695,23 @@ interface AmaFileConfig {
 }
 ```
 
+### `AtMyAppConfig`
+
+Options for direct configuration approach:
+
+```typescript
+interface AtMyAppConfig {
+  // API key for authentication
+  apiKey: string;
+
+  // Base URL for the AtMyApp project
+  projectUrl: string;
+
+  // Optional cache duration in seconds (default: 3600)
+  defaultCacheDuration?: number;
+}
+```
+
 ## Security Considerations
 
 ### HTML Components
@@ -638,13 +735,40 @@ interface AmaFileConfig {
 You can customize the caching behavior for different resources:
 
 ```tsx
+// With Provider
 <AmaProvider
   apiKey="your-api-key"
   projectUrl="https://your-project.atmyapp.com"
   defaultCacheDuration={1800} // 30 minutes default cache
 >
   <YourApp />
-</AmaProvider>
+</AmaProvider>;
+
+// Or with direct configuration
+const atmyapp = createAtMyApp({
+  apiKey: "your-api-key",
+  projectUrl: "https://your-project.atmyapp.com",
+  defaultCacheDuration: 1800, // 30 minutes default cache
+});
+```
+
+### Mixing Provider and Direct Configuration
+
+You can mix both approaches in the same application:
+
+```tsx
+// Component within provider but using explicit config
+function SpecialCaseComponent() {
+  // This uses a different configuration than the provider
+  const specialConfig = createAtMyApp({
+    apiKey: "special-api-key",
+    projectUrl: "https://special-project.atmyapp.com",
+  });
+
+  const { data } = useAmaContent("special/content.json", specialConfig);
+
+  return <div>{/* ... */}</div>;
+}
 ```
 
 ### Combining Multiple Resource Types
@@ -690,6 +814,77 @@ function ProductPage({ productId }) {
   );
 }
 ```
+
+## CLI Tools
+
+AtMyApp comes with CLI tools to simplify project setup and type management:
+
+### Installation
+
+The CLI is included with the package and can be used via npx:
+
+```bash
+npx ama [command]
+```
+
+Or add scripts to your package.json:
+
+```json
+{
+  "scripts": {
+    "ama:use": "ama use",
+    "ama:migrate": "ama migrate"
+  }
+}
+```
+
+### Authentication
+
+Set up authentication with the `use` command:
+
+```bash
+npx ama use
+```
+
+This interactive command will:
+
+1. Prompt for your project URL and authentication token
+2. Save the configuration in `.ama/session.json`
+3. Add the session file to `.gitignore` for security
+
+You can also provide arguments directly:
+
+```bash
+npx ama use --url https://your-project.atmyapp.com --token your-token
+```
+
+### Type Migration
+
+The `migrate` command analyzes your TypeScript files and extracts AMA type definitions:
+
+```bash
+npx ama migrate
+```
+
+Options:
+
+- `--dry-run`: Show what would be migrated without making changes
+- `--verbose`: Show detailed logs during migration
+- `--tsconfig <path>`: Specify a custom tsconfig.json path
+- `--continue-on-error`: Continue processing even when errors are encountered
+
+Example:
+
+```bash
+npx ama migrate --verbose --tsconfig ./tsconfig.build.json
+```
+
+This command:
+
+1. Scans your TypeScript files for AMA type references
+2. Extracts the type information
+3. Generates proper schema definitions
+4. Creates or updates type definitions in your project
 
 ## TypeScript Support
 

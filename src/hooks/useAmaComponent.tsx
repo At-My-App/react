@@ -30,20 +30,35 @@ interface AmaComponentHook {
  *
  * @template T - Component reference type
  * @param path - The component path
- * @param config - Optional configuration overrides
+ * @param config - Optional configuration overrides for the component
+ * @param atmyAppConfig - Optional configuration object from createAtMyApp
  * @returns Object containing the HTML content, loading state, and errors
  */
 export function useAmaComponent<C extends AmaComponentRef<any, any>>(
   path: C["path"],
-  config?: Partial<AmaComponentConfig>
+  config?: Partial<AmaComponentConfig>,
+  atmyAppConfig?: ReturnType<typeof import("../createAtMyApp").createAtMyApp>
 ): AmaComponentHook {
-  const context = useAmaContext();
+  // Use provided config or get from context
+  let amaConfig: {
+    apiKey: string;
+    projectUrl: string;
+    cache: Map<string, any>;
+  };
 
-  if (!context) {
-    throw new Error("useAmaComponent must be used within an AmaProvider");
+  if (atmyAppConfig) {
+    amaConfig = atmyAppConfig;
+  } else {
+    const context = useAmaContext();
+    if (!context) {
+      throw new Error(
+        "useAmaComponent must be used within an AmaProvider or provide a configuration"
+      );
+    }
+    amaConfig = context;
   }
 
-  const { apiKey, projectUrl, cache } = context;
+  const { apiKey, projectUrl, cache } = amaConfig;
 
   const [html, setHtml] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(true);

@@ -22,18 +22,33 @@ const imageCache = new Map<string, string>();
  * Custom hook to fetch and load an image from the CMS
  *
  * @param path - The image path
+ * @param atmyAppConfig - Optional configuration object from createAtMyApp
  * @returns Object containing the image src, loading state, and errors
  */
 export function useAmaImage<C extends AmaImageRef<any, any>>(
-  path: C["path"]
+  path: C["path"],
+  atmyAppConfig?: ReturnType<typeof import("../createAtMyApp").createAtMyApp>
 ): AmaImageHook {
-  const context = useAmaContext();
+  // Use provided config or get from context
+  let config: {
+    apiKey: string;
+    projectUrl: string;
+    cache: Map<string, any>;
+  };
 
-  if (!context) {
-    throw new Error("useAmaImage must be used within an AmaProvider");
+  if (atmyAppConfig) {
+    config = atmyAppConfig;
+  } else {
+    const context = useAmaContext();
+    if (!context) {
+      throw new Error(
+        "useAmaImage must be used within an AmaProvider or provide a configuration"
+      );
+    }
+    config = context;
   }
 
-  const { apiKey, projectUrl, cache } = context;
+  const { apiKey, projectUrl, cache } = config;
 
   const [src, setSrc] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(true);

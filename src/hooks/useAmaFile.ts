@@ -24,18 +24,33 @@ const fileCache = new Map<string, ArrayBuffer>();
  * Custom hook to fetch a raw file (as ArrayBuffer) from the CMS
  * @template C - File reference type
  * @param path - The file path
+ * @param atmyAppConfig - Optional configuration object from createAtMyApp
  * @returns Object containing fetched data, loading state, and errors
  */
 export function useAmaFile<C extends AmaFileRef<any, any>>(
-  path: C["path"]
+  path: C["path"],
+  atmyAppConfig?: ReturnType<typeof import("../createAtMyApp").createAtMyApp>
 ): AmaFileHook {
-  const context = useAmaContext();
+  // Use provided config or get from context
+  let config: {
+    apiKey: string;
+    projectUrl: string;
+    cache: Map<string, any>;
+  };
 
-  if (!context) {
-    throw new Error("useAmaFile must be used within an AmaProvider");
+  if (atmyAppConfig) {
+    config = atmyAppConfig;
+  } else {
+    const context = useAmaContext();
+    if (!context) {
+      throw new Error(
+        "useAmaFile must be used within an AmaProvider or provide a configuration"
+      );
+    }
+    config = context;
   }
 
-  const { apiKey, projectUrl, cache } = context;
+  const { apiKey, projectUrl, cache } = config;
 
   const [data, setData] = useState<ArrayBuffer | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
