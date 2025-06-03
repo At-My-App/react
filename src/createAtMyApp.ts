@@ -1,3 +1,9 @@
+import {
+  createAtMyAppClient,
+  AtMyAppClient,
+  AtMyAppClientOptions,
+} from "@atmyapp/core";
+
 /**
  * Configuration interface for AtMyApp
  */
@@ -5,20 +11,21 @@ export interface AtMyAppConfig {
   /** API key for authentication */
   apiKey: string;
   /** Base URL for the AtMyApp project */
-  projectUrl: string;
-  /** Optional cache duration in seconds */
-  defaultCacheDuration?: number;
+  baseUrl: string;
+  /** Optional preview key for draft content */
+  previewKey?: string;
 }
 
 /**
- * Creates an AtMyApp configuration object that can be passed to hooks
+ * Creates an AtMyApp client instance that can be passed to hooks
  * as an alternative to using the AmaProvider
  */
-export function createAtMyApp(config: AtMyAppConfig) {
-  return {
+export function createAtMyApp(config: AtMyAppConfig): AtMyAppClient {
+  const options: AtMyAppClientOptions = {
     apiKey: config.apiKey,
-    projectUrl: config.projectUrl,
-    cache: new Map<string, any>(),
-    defaultCacheDuration: config.defaultCacheDuration || 3600,
+    baseUrl: config.baseUrl,
+    previewKey: config.previewKey,
   };
+
+  return createAtMyAppClient(options);
 }

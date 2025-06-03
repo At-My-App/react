@@ -1,40 +1,27 @@
-// Types
-export { type AmaContentRef } from "./types/AmaContent";
+// Re-export core types for convenience
 export {
-  type AmaImageRef,
-  type AmaImageConfig,
-  type AmaImage,
-} from "./types/AmaImage";
-export {
-  type AmaComponentRef,
-  type AmaComponentConfig,
-} from "./types/AmaComponent";
+  AmaContentDef,
+  AmaImageDef,
+  AmaFileDef,
+  AmaContent,
+  AmaImage,
+  AmaFile,
+  AtMyAppClient,
+  AtMyAppClientOptions,
+  AmaCustomEvent,
+  AmaCustomEventDef,
+  AmaEvent,
+  AmaEventDef,
+} from "@atmyapp/core";
 
 // Hooks
 export { useAmaContent } from "./hooks/useAmaContent";
 export { useAmaImage } from "./hooks/useAmaImage";
-export { useAmaComponent } from "./hooks/useAmaComponent";
 export { useAmaFile } from "./hooks/useAmaFile";
-
-// Components
-export { AmaComponentRenderer } from "./components/AmaComponentRenderer";
-
-// Utils
-export { sanitizeHtml } from "./utils/sanitizeHtml";
-export {
-  listenToComponentEvent,
-  sendToComponent,
-  injectComponentData,
-} from "./utils/componentInterop";
-export { createAmaUrl, amaFetch, getContentType } from "./utils/amaFetch";
+export { useAmaAnalytics } from "./hooks/useAmaAnalytics";
 
 // Context
-export * from "./context/AmaProvider";
-
-// Types exports
-export * from "./types/AmaContent";
-export * from "./types/AmaFile";
-export * from "./types/AmaImage";
+export { AmaProvider, useAmaContext } from "./context/AmaProvider";
 
 // Configuration creator
 export { createAtMyApp, type AtMyAppConfig } from "./createAtMyApp";

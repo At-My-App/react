@@ -1,58 +1,42 @@
 import { useState, useEffect } from "react";
 import { useAmaContext } from "../context/AmaProvider";
-import { AmaFileRef } from "../types/AmaFile";
-import { amaFetch, createAmaUrl } from "../utils/amaFetch";
+import { AmaFileDef, AtMyAppClient } from "@atmyapp/core";
 
 /**
  * Hook return type
  */
 interface AmaFileHook {
-  /** The file data as ArrayBuffer */
-  data: ArrayBuffer | null;
+  /** The file URL */
+  src: string;
   /** True while data is being fetched */
   isLoading: boolean;
   /** Error object if data fetching fails */
   error: Error | null;
 }
 
-type GetPathFromGeneric<T> = T extends AmaFileRef<infer P, any> ? P : never;
-
-// Cache store for file data with path-based keys
-const fileCache = new Map<string, ArrayBuffer>();
-
 /**
- * Custom hook to fetch a raw file (as ArrayBuffer) from the CMS
- * @template C - File reference type
+ * Custom hook to fetch a file from the CMS using the core library
+ *
+ * @template T - File type definition
  * @param path - The file path
- * @param atmyAppConfig - Optional configuration object from createAtMyApp
- * @returns Object containing fetched data, loading state, and errors
+ * @param client - Optional AtMyApp client instance from createAtMyApp
+ * @returns Object containing file src, loading state, and errors
  */
-export function useAmaFile<C extends AmaFileRef<any, any>>(
-  path: C["path"],
-  atmyAppConfig?: ReturnType<typeof import("../createAtMyApp").createAtMyApp>
+export function useAmaFile<T extends AmaFileDef<string, any>>(
+  path: T["path"],
+  client?: AtMyAppClient
 ): AmaFileHook {
-  // Use provided config or get from context
-  let config: {
-    apiKey: string;
-    projectUrl: string;
-    cache: Map<string, any>;
-  };
+  // Use provided client or get from context
+  const context = !client ? useAmaContext() : null;
+  const amaClient = client || context?.client;
 
-  if (atmyAppConfig) {
-    config = atmyAppConfig;
-  } else {
-    const context = useAmaContext();
-    if (!context) {
-      throw new Error(
-        "useAmaFile must be used within an AmaProvider or provide a configuration"
-      );
-    }
-    config = context;
+  if (!amaClient) {
+    throw new Error(
+      "useAmaFile must be used within an AmaProvider or provide a client instance"
+    );
   }
 
-  const { apiKey, projectUrl, cache } = config;
-
-  const [data, setData] = useState<ArrayBuffer | null>(null);
+  const [src, setSrc] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -63,43 +47,18 @@ export function useAmaFile<C extends AmaFileRef<any, any>>(
         return;
       }
 
-      // Create cache key
-      const cacheKey = `file:${path}`;
-
       try {
-        // Check if the data is in the context cache
-        if (cache.has(cacheKey)) {
-          setData(cache.get(cacheKey) as ArrayBuffer);
-          setIsLoading(false);
-          return;
-        }
-
-        // Check the local fileCache as well
-        if (fileCache.has(cacheKey)) {
-          setData(fileCache.get(cacheKey) as ArrayBuffer);
-          setIsLoading(false);
-          // Still update the main cache for future references
-          cache.set(cacheKey, fileCache.get(cacheKey));
-          return;
-        }
-
-        // Construct the full URL
-        const url = createAmaUrl(projectUrl, path);
-
         setIsLoading(true);
         setError(null);
 
-        // Fetch the file
-        const fileData = await amaFetch<ArrayBuffer>(url, {
-          apiKey,
-          responseType: "arraybuffer",
-        });
+        // Use the core client's collections API
+        const result = await amaClient.collections.get(path, "file");
 
-        // Store in both caches
-        cache.set(cacheKey, fileData);
-        fileCache.set(cacheKey, fileData);
+        if (result.isError) {
+          throw new Error(result.errorMessage || "Failed to fetch file");
+        }
 
-        setData(fileData);
+        setSrc(result.src);
         setIsLoading(false);
       } catch (err) {
         console.error("Error fetching file:", err);
@@ -109,7 +68,7 @@ export function useAmaFile<C extends AmaFileRef<any, any>>(
     };
 
     fetchFile();
-  }, [path, apiKey, projectUrl, cache]);
+  }, [path, amaClient]);
 
-  return { data, isLoading, error };
+  return { src, isLoading, error };
 }

@@ -1,899 +1,519 @@
-# AtMyApp React Package
+# 🚀 AtMyApp React
 
-A comprehensive React library for integrating with the AtMyApp CMS platform, providing type-safe content, image, file, and HTML component management.
+[![npm version](https://badge.fury.io/js/%40atmyapp%2Freact.svg)](https://badge.fury.io/js/%40atmyapp%2Freact)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 
-## Features
+> 🎯 **React hooks for AtMyApp.** The official React library for AtMyApp - AI-powered content management with type-safe hooks.
 
-- 📄 **Content Management**: Fetch and manage JSON content from your AtMyApp CMS
-- 🖼️ **Image Handling**: Load and optimize images with automatic caching
-- 📁 **File Management**: Download and handle files with proper content types
-- 🧩 **HTML Components**: Embed server-rendered HTML components with React integration
-- 🔄 **Two-way Communication**: Interact between React and embedded HTML components
-- 🔒 **Security**: Built-in HTML sanitization for safely embedding third-party content
-- 💾 **Smart Caching**: Efficient caching for improved performance
-- 📱 **TypeScript Support**: Fully typed API for better developer experience
-- 🛠️ **CLI Tools**: Migration and authentication utilities
+## 📖 Table of Contents
 
-## Installation
+- [🌟 Features](#-features)
+- [📦 Installation](#-installation)
+- [🚀 Quick Start](#-quick-start)
+- [📚 API Reference](#-api-reference)
+  - [Provider Setup](#provider-setup)
+  - [Content Hooks](#content-hooks)
+  - [Analytics Hooks](#analytics-hooks)
+- [🧪 Testing](#-testing)
+- [💡 Examples](#-examples)
+- [🤝 Contributing](#-contributing)
+- [📄 License](#-license)
+
+## 🌟 Features
+
+✨ **Type-Safe Hooks** - React hooks with full TypeScript support  
+🔄 **Real-time Content** - Fetch content, images, and files from AtMyApp  
+📊 **Built-in Analytics** - Track events with React hooks  
+⚡ **Core Library Integration** - Built on @atmyapp/core for consistency  
+🎯 **Auto-Caching** - Intelligent caching for optimal performance  
+🚀 **Zero Configuration** - Works out of the box with minimal setup
+
+## 📦 Installation
 
 ```bash
-npm install @atmyapp/react-package
+# npm
+npm install @atmyapp/react @atmyapp/core
+
+# yarn
+yarn add @atmyapp/react @atmyapp/core
+
+# pnpm
+pnpm add @atmyapp/react @atmyapp/core
 ```
 
-## Setup
+## 🚀 Quick Start
 
-AtMyApp can be set up in two ways: using a Provider for your entire application, or using direct configuration for more targeted usage.
-
-### Method 1: Provider Pattern
-
-Wrap your application with the `AmaProvider` to set up configuration once at the application level:
+### Option 1: Using Provider (Recommended)
 
 ```tsx
-import { AmaProvider } from "@atmyapp/react-package";
+import React from "react";
+import { AmaProvider, useAmaContent } from "@atmyapp/react";
 
+// Wrap your app with the provider
 function App() {
   return (
     <AmaProvider
       apiKey="your-api-key"
-      projectUrl="https://your-project.atmyapp.com"
+      baseUrl="https://api.atmyapp.com"
+      previewKey="optional-preview-key"
     >
-      <YourApp />
+      <BlogPost />
+    </AmaProvider>
+  );
+}
+
+// Use hooks in your components
+function BlogPost() {
+  const { data, isLoading, error } = useAmaContent("/blog/latest");
+
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+
+  return (
+    <article>
+      <h1>{data.title}</h1>
+      <p>{data.content}</p>
+    </article>
+  );
+}
+```
+
+### Option 2: Using Client Instance
+
+```tsx
+import React from "react";
+import { createAtMyApp, useAmaContent } from "@atmyapp/react";
+
+// Create a client instance
+const amaClient = createAtMyApp({
+  apiKey: "your-api-key",
+  baseUrl: "https://api.atmyapp.com",
+});
+
+function BlogPost() {
+  const { data, isLoading, error } = useAmaContent("/blog/latest", amaClient);
+
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+
+  return (
+    <article>
+      <h1>{data.title}</h1>
+      <p>{data.content}</p>
+    </article>
+  );
+}
+```
+
+## 📚 API Reference
+
+### Provider Setup
+
+#### `AmaProvider`
+
+Provides AtMyApp client context to child components.
+
+```tsx
+<AmaProvider
+  apiKey="your-api-key"
+  baseUrl="https://api.atmyapp.com"
+  previewKey="optional-preview-key" // For draft content
+>
+  {children}
+</AmaProvider>
+```
+
+#### `createAtMyApp(config)`
+
+Creates a client instance for use without provider.
+
+```tsx
+const client = createAtMyApp({
+  apiKey: "your-api-key",
+  baseUrl: "https://api.atmyapp.com",
+  previewKey: "optional-preview-key",
+});
+```
+
+### Content Hooks
+
+#### `useAmaContent<T>(path, client?)`
+
+Fetch typed content from AtMyApp.
+
+```tsx
+import { useAmaContent, AmaContentDef } from "@atmyapp/react";
+
+// Define your content type
+type BlogPost = AmaContentDef<
+  "/blog/post",
+  {
+    title: string;
+    content: string;
+    publishedAt: string;
+  }
+>;
+
+function BlogComponent() {
+  const { data, isLoading, error } = useAmaContent<BlogPost>("/blog/post");
+
+  // data is typed as { title: string; content: string; publishedAt: string; }
+}
+```
+
+#### `useAmaImage<T>(path, client?)`
+
+Fetch optimized images from AtMyApp.
+
+```tsx
+import { useAmaImage, AmaImageDef } from "@atmyapp/react";
+
+// Define your image type
+type HeroImage = AmaImageDef<
+  "/images/hero",
+  {
+    optimizeFormat: "webp";
+    maxSize: { width: 1920; height: 1080 };
+  }
+>;
+
+function HeroComponent() {
+  const { src, isLoading, error } = useAmaImage<HeroImage>("/images/hero");
+
+  if (isLoading) return <div>Loading image...</div>;
+  if (error) return <div>Failed to load image</div>;
+
+  return <img src={src} alt="Hero" />;
+}
+```
+
+#### `useAmaFile<T>(path, client?)`
+
+Fetch files from AtMyApp.
+
+```tsx
+import { useAmaFile, AmaFileDef } from "@atmyapp/react";
+
+type DocumentFile = AmaFileDef<
+  "/docs/manual.pdf",
+  {
+    contentType: "application/pdf";
+  }
+>;
+
+function DocumentComponent() {
+  const { src, isLoading, error } =
+    useAmaFile<DocumentFile>("/docs/manual.pdf");
+
+  if (isLoading) return <div>Loading document...</div>;
+  if (error) return <div>Failed to load document</div>;
+
+  return (
+    <a href={src} target="_blank">
+      Download Manual
+    </a>
+  );
+}
+```
+
+### Analytics Hooks
+
+#### `useAmaAnalytics(client?)`
+
+Access analytics functionality for tracking events.
+
+```tsx
+import { useAmaAnalytics } from "@atmyapp/react";
+
+function ProductPage() {
+  const analytics = useAmaAnalytics();
+
+  const handleAddToCart = async () => {
+    // Track basic event (server collects metadata automatically)
+    await analytics.trackBasicEvent("add_to_cart");
+
+    // Track custom event with data
+    await analytics.trackEvent("purchase", {
+      product_id: "prod_123",
+      amount: "99.99",
+      currency: "USD",
+      user_id: "user_456",
+    });
+  };
+
+  return <button onClick={handleAddToCart}>Add to Cart</button>;
+}
+```
+
+## 🧪 Testing
+
+The library includes comprehensive test coverage for all hooks and components. Tests are written using Jest and React Testing Library.
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm test -- --coverage
+```
+
+### Writing Tests
+
+When testing components that use AtMyApp hooks, wrap them in the `AmaProvider`:
+
+```tsx
+import { render } from "@testing-library/react";
+import { AmaProvider } from "@atmyapp/react";
+
+function TestWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <AmaProvider apiKey="test-key" baseUrl="https://test.atmyapp.com">
+      {children}
+    </AmaProvider>
+  );
+}
+
+test("my component", () => {
+  render(
+    <TestWrapper>
+      <MyComponent />
+    </TestWrapper>
+  );
+
+  // Your test assertions...
+});
+```
+
+Alternatively, provide a client instance directly:
+
+```tsx
+import { createAtMyApp } from "@atmyapp/react";
+
+const testClient = createAtMyApp({
+  apiKey: "test-key",
+  baseUrl: "https://test.atmyapp.com",
+});
+
+function MyComponent() {
+  const { data } = useAmaContent("/test/path", testClient);
+  // Component logic...
+}
+```
+
+### Mocking AtMyApp
+
+For unit tests, you may want to mock the core library:
+
+```tsx
+jest.mock("@atmyapp/core", () => ({
+  createAtMyAppClient: jest.fn(() => ({
+    collections: {
+      get: jest.fn().mockResolvedValue({
+        isError: false,
+        data: { title: "Mock Content" },
+      }),
+    },
+    analytics: {
+      trackBasicEvent: jest.fn().mockResolvedValue(true),
+      trackEvent: jest.fn().mockResolvedValue(true),
+    },
+  })),
+}));
+```
+
+## 💡 Examples
+
+### E-commerce Product Catalog
+
+```tsx
+import React from "react";
+import {
+  AmaProvider,
+  useAmaContent,
+  useAmaImage,
+  useAmaAnalytics,
+  AmaContentDef,
+  AmaImageDef,
+} from "@atmyapp/react";
+
+// Define types
+type Product = {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+};
+
+type ProductCatalog = AmaContentDef<"/products/catalog", Product[]>;
+type ProductImage = AmaImageDef<
+  "/images/products",
+  {
+    optimizeFormat: "webp";
+    maxSize: { width: 400; height: 400 };
+  }
+>;
+
+function ProductList() {
+  const { data: products, isLoading } =
+    useAmaContent<ProductCatalog>("/products/catalog");
+  const analytics = useAmaAnalytics();
+
+  const handleProductView = async (productId: string) => {
+    await analytics.trackBasicEvent("product_view");
+    await analytics.trackEvent("product_interaction", {
+      product_id: productId,
+      action: "view",
+      timestamp: new Date().toISOString(),
+    });
+  };
+
+  if (isLoading) return <div>Loading products...</div>;
+
+  return (
+    <div className="product-grid">
+      {products?.map((product) => (
+        <ProductCard
+          key={product.id}
+          product={product}
+          onView={() => handleProductView(product.id)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ProductCard({
+  product,
+  onView,
+}: {
+  product: Product;
+  onView: () => void;
+}) {
+  const { src: imageSrc } = useAmaImage<ProductImage>(
+    `/images/products/${product.id}`
+  );
+
+  return (
+    <div className="product-card" onClick={onView}>
+      <img src={imageSrc} alt={product.name} />
+      <h3>{product.name}</h3>
+      <p>${product.price}</p>
+      <p>{product.description}</p>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <AmaProvider
+      apiKey={process.env.REACT_APP_ATMYAPP_API_KEY!}
+      baseUrl={process.env.REACT_APP_ATMYAPP_BASE_URL!}
+    >
+      <ProductList />
     </AmaProvider>
   );
 }
 ```
 
-### Method 2: Direct Configuration (Without Provider)
-
-Create a configuration object that can be passed directly to hooks:
+### Blog with Analytics
 
 ```tsx
-import { createAtMyApp } from "@atmyapp/react-package";
+import React, { useEffect } from "react";
+import { useAmaContent, useAmaAnalytics, AmaContentDef } from "@atmyapp/react";
 
-// Create the configuration object
-const atmyapp = createAtMyApp({
-  apiKey: "your-api-key",
-  projectUrl: "https://your-project.atmyapp.com",
-  defaultCacheDuration: 3600, // optional, in seconds
-});
-
-// Export it for use throughout your application
-export default atmyapp;
-```
-
-This approach is ideal for:
-
-- Using AtMyApp in isolated parts of your application
-- Working in a component library where adding context may be challenging
-- Having more control over configuration per-component
-
-## Type System
-
-AtMyApp uses a powerful type system to provide type safety and intellisense for your content.
-
-### `AmaContentRef`
-
-Used for defining JSON content structures:
-
-```tsx
-import { AmaContentRef } from "@atmyapp/react-package";
-
-// Define a content structure
-export type HomepageContent = AmaContentRef<
-  "homepage/content.json", // Path to the content
+type BlogPost = AmaContentDef<
+  "/blog/posts",
   {
     title: string;
-    subtitle: string;
-    features: Array<{
-      title: string;
-      description: string;
-    }>;
+    content: string;
+    author: string;
+    publishedAt: string;
+    tags: string[];
   }
 >;
-```
 
-### `AmaImageRef`
+function BlogPostPage({ slug }: { slug: string }) {
+  const {
+    data: post,
+    isLoading,
+    error,
+  } = useAmaContent<BlogPost>(`/blog/posts/${slug}`);
+  const analytics = useAmaAnalytics();
 
-Used for defining image resources:
+  // Track page view when component mounts
+  useEffect(() => {
+    analytics.trackBasicEvent("page_view");
+    analytics.trackEvent("content_view", {
+      content_type: "blog_post",
+      content_id: slug,
+      timestamp: new Date().toISOString(),
+    });
+  }, [slug, analytics]);
 
-```tsx
-import { AmaImageRef, AmaImageConfig } from "@atmyapp/react-package";
+  const handleShare = async (platform: string) => {
+    await analytics.trackBasicEvent("content_share");
+    await analytics.trackEvent("social_share", {
+      content_id: slug,
+      platform,
+      content_type: "blog_post",
+    });
+  };
 
-// Basic image reference
-export type LogoImage = AmaImageRef<"images/logo.png">;
-
-// Image with configuration
-export type HeroImage = AmaImageRef<
-  "images/hero.jpg",
-  {
-    optimizeFormat: "webp";
-    ratioHint: { x: 16; y: 9 };
-    maxSize: { width: 1920; height: 1080 };
-  }
->;
-```
-
-### `AmaComponentRef`
-
-Used for defining HTML component resources:
-
-```tsx
-import { AmaComponentRef } from "@atmyapp/react-package";
-
-// Basic component reference
-export type HeaderComponent = AmaComponentRef<"components/header.html">;
-
-// Component with configuration
-export type UserContentComponent = AmaComponentRef<
-  "components/user-content.html",
-  {
-    sanitize: true;
-    allowedTags: string[];
-    cacheDuration: number;
-  }
->;
-```
-
-### `AmaFileRef`
-
-Used for defining file resources:
-
-```tsx
-import { AmaFileRef } from "@atmyapp/react-package";
-
-// Basic file reference
-export type PdfDocument = AmaFileRef<"documents/guide.pdf">;
-
-// File with custom content type
-export type CustomFile = AmaFileRef<
-  "data/export.dat",
-  {
-    contentType: "application/octet-stream";
-  }
->;
-```
-
-## Hooks
-
-All hooks can be used either with the Provider pattern or with direct configuration.
-
-### `useAmaContent`
-
-Fetches JSON content from the CMS:
-
-```tsx
-import { useAmaContent } from "@atmyapp/react-package";
-import { HomepageContent } from "./types";
-
-function HomePage() {
-  // With Provider
-  const { data, isLoading, error } = useAmaContent<HomepageContent>(
-    "homepage/content.json"
-  );
-
-  // Or with direct configuration
-  // const { data, isLoading, error } = useAmaContent<HomepageContent>(
-  //   "homepage/content.json",
-  //   atmyapp
-  // );
-
-  if (isLoading) return <div>Loading...</div>;
-  if (error) return <div>Error loading content</div>;
+  if (isLoading) return <div>Loading post...</div>;
+  if (error) return <div>Post not found</div>;
+  if (!post) return <div>No post data</div>;
 
   return (
-    <div>
-      <h1>{data.title}</h1>
-      <h2>{data.subtitle}</h2>
-      {data.features.map((feature, index) => (
-        <div key={index}>
-          <h3>{feature.title}</h3>
-          <p>{feature.description}</p>
+    <article>
+      <header>
+        <h1>{post.title}</h1>
+        <p>
+          By {post.author} on {post.publishedAt}
+        </p>
+        <div className="tags">
+          {post.tags.map((tag) => (
+            <span key={tag} className="tag">
+              {tag}
+            </span>
+          ))}
         </div>
-      ))}
-    </div>
-  );
-}
-```
+      </header>
 
-### `useAmaImage`
+      <div className="content">{post.content}</div>
 
-Loads and manages images from the CMS:
-
-```tsx
-import { useAmaImage } from "@atmyapp/react-package";
-import { LogoImage, HeroImage } from "./types";
-
-function ImageExample() {
-  // Basic usage with Provider
-  const logo = useAmaImage<LogoImage>("images/logo.png");
-
-  // Or with direct configuration
-  // const logo = useAmaImage<LogoImage>("images/logo.png", atmyapp);
-
-  // With type safety from a reference
-  const hero = useAmaImage<HeroImage>("images/hero.jpg");
-
-  if (logo.isLoading || hero.isLoading) return <div>Loading images...</div>;
-
-  return (
-    <div>
-      <img src={logo.src} alt="Logo" className="logo" />
-      <img src={hero.src} alt="Hero" className="hero-image" />
-    </div>
-  );
-}
-```
-
-### `useAmaFile`
-
-Manages file resources from the CMS:
-
-```tsx
-import { useAmaFile } from "@atmyapp/react-package";
-import { PdfDocument } from "./types";
-
-function FileExample() {
-  // With Provider
-  const { data, isLoading, error } = useAmaFile<PdfDocument>(
-    "documents/guide.pdf"
-  );
-
-  // Or with direct configuration
-  // const { data, isLoading, error } = useAmaFile<PdfDocument>(
-  //   "documents/guide.pdf",
-  //   atmyapp
-  // );
-
-  if (isLoading) return <div>Loading file...</div>;
-  if (error) return <div>Error loading file</div>;
-
-  return (
-    <div>
-      <a
-        href={URL.createObjectURL(
-          new Blob([data], { type: "application/pdf" })
-        )}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        View Document
-      </a>
-      <button
-        onClick={() => {
-          const url = URL.createObjectURL(
-            new Blob([data], { type: "application/pdf" })
-          );
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = "user-guide.pdf";
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }}
-      >
-        Download PDF
-      </button>
-    </div>
-  );
-}
-```
-
-### `useAmaComponent`
-
-Fetches HTML components from the CMS:
-
-```tsx
-import { useAmaComponent } from "@atmyapp/react-package";
-import { HeaderComponent } from "./types";
-
-function ComponentExample() {
-  // With Provider
-  const { html, isLoading, error } = useAmaComponent<HeaderComponent>(
-    "components/header.html",
-    {
-      sanitize: true,
-      cacheDuration: 3600, // 1 hour in seconds
-    }
-  );
-
-  // Or with direct configuration
-  // const { html, isLoading, error } = useAmaComponent<HeaderComponent>(
-  //   "components/header.html",
-  //   {
-  //     sanitize: true,
-  //     cacheDuration: 3600,
-  //   },
-  //   atmyapp
-  // );
-
-  if (isLoading) return <div>Loading component...</div>;
-  if (error) return <div>Error loading component</div>;
-
-  // Note: Using dangerouslySetInnerHTML directly isn't recommended
-  // Use the AmaComponentRenderer component instead (shown below)
-  return <div dangerouslySetInnerHTML={{ __html: html }} />;
-}
-```
-
-## Components
-
-### `AmaComponentRenderer`
-
-Renders HTML components with proper configuration and safety:
-
-```tsx
-import { AmaComponentRenderer } from "@atmyapp/react-package";
-
-function ComponentRendererExample() {
-  return (
-    <div>
-      {/* Basic usage */}
-      <AmaComponentRenderer path="components/header.html" />
-
-      {/* With configuration */}
-      <AmaComponentRenderer
-        path="components/user-content.html"
-        config={{
-          sanitize: true,
-          allowedTags: ["div", "p", "h1", "h2", "a", "ul", "li"],
-          cacheDuration: 1800, // 30 minutes
-        }}
-        className="user-content-container"
-        as="section"
-        loadingComponent={<div className="loading-spinner">Loading...</div>}
-        errorComponent={<div className="error-message">Failed to load</div>}
-      />
-    </div>
-  );
-}
-```
-
-## Interactive Components
-
-### Passing Data to HTML Components
-
-```tsx
-import {
-  AmaComponentRenderer,
-  injectComponentData,
-} from "@atmyapp/react-package";
-
-function UserProfile({ userId, username, isAdmin }) {
-  // Create data attributes to pass to the HTML component
-  const userData = injectComponentData({
-    userId,
-    username,
-    isAdmin,
-    lastLogin: new Date().toISOString(),
-  });
-
-  return (
-    <AmaComponentRenderer
-      path="components/profile.html"
-      {...userData} // Passes as data-ama-userId, data-ama-username, etc.
-    />
-  );
-}
-```
-
-Inside the HTML component:
-
-```html
-<div class="profile-widget">
-  <script>
-    // Get the parent component container
-    const container = document.currentScript.parentElement;
-
-    // Get data passed from React via data attributes
-    const userId = container.getAttribute("data-ama-userId");
-    const username = container.getAttribute("data-ama-username");
-    const isAdmin = container.getAttribute("data-ama-isAdmin") === "true";
-    const lastLogin = container.getAttribute("data-ama-lastLogin");
-
-    // Use the data in your component
-    document.getElementById("username").textContent = username;
-    document.getElementById("user-id").textContent = userId;
-
-    if (isAdmin) {
-      document.getElementById("admin-badge").style.display = "inline-block";
-    }
-  </script>
-
-  <div class="user-info">
-    <span id="username"></span>
-    <span id="admin-badge" style="display: none;">Admin</span>
-    <small>ID: <span id="user-id"></span></small>
-  </div>
-</div>
-```
-
-### Two-way Communication
-
-React component with event handling:
-
-```tsx
-import React, { useState, useEffect } from "react";
-import {
-  AmaComponentRenderer,
-  listenToComponentEvent,
-  sendToComponent,
-} from "@atmyapp/react-package";
-
-function InteractiveWidget() {
-  const [count, setCount] = useState(0);
-  const [lastAction, setLastAction] = useState("");
-
-  // Listen for events from the HTML component
-  useEffect(() => {
-    // Setup event listener
-    const cleanup = listenToComponentEvent<{
-      action: string;
-      timestamp: number;
-    }>("component:action", (data) => {
-      console.log("Action from HTML component:", data);
-      setLastAction(
-        `${data.action} at ${new Date(data.timestamp).toLocaleTimeString()}`
-      );
-
-      if (data.action === "increment") {
-        setCount((prev) => prev + 1);
-      } else if (data.action === "reset") {
-        setCount(0);
-      }
-    });
-
-    // Return cleanup function to remove event listener
-    return cleanup;
-  }, []);
-
-  // Send updates to the HTML component when count changes
-  useEffect(() => {
-    sendToComponent("react:stateUpdate", {
-      count,
-      timestamp: Date.now(),
-    });
-  }, [count]);
-
-  return (
-    <div className="interactive-widget">
-      <div className="react-section">
-        <h3>React Side</h3>
-        <p>Count: {count}</p>
-        <button onClick={() => setCount((prev) => prev + 1)}>
-          Increment from React
+      <footer>
+        <button onClick={() => handleShare("twitter")}>Share on Twitter</button>
+        <button onClick={() => handleShare("facebook")}>
+          Share on Facebook
         </button>
-        <button onClick={() => setCount(0)}>Reset</button>
-        {lastAction && <p>Last action from component: {lastAction}</p>}
-      </div>
-
-      <AmaComponentRenderer
-        path="components/counter-widget.html"
-        config={{ sanitize: false }} // Allow scripts in trusted components
-      />
-    </div>
+      </footer>
+    </article>
   );
 }
 ```
 
-HTML component with event handling:
+## 🤝 Contributing
 
-```html
-<div class="counter-widget">
-  <h3>HTML Component Side</h3>
-  <p>Count value: <span id="count-display">0</span></p>
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
-  <div class="buttons">
-    <button id="increment-btn">Increment Counter</button>
-    <button id="reset-btn">Reset Counter</button>
-  </div>
+## 📄 License
 
-  <div class="event-log">
-    <h4>Event Log:</h4>
-    <ul id="event-list"></ul>
-  </div>
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-  <script>
-    // Initialize counter value
-    let counterValue = 0;
+---
 
-    // Add event to log
-    function logEvent(message) {
-      const eventList = document.getElementById("event-list");
-      const logItem = document.createElement("li");
-      logItem.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
-      eventList.prepend(logItem);
+<div align="center">
 
-      // Keep only the latest 5 events
-      while (eventList.children.length > 5) {
-        eventList.removeChild(eventList.lastChild);
-      }
-    }
+**[🌐 AtMyApp Website](https://atmyapp.com)** • **[📚 Documentation](https://docs.atmyapp.com)** • **[💬 Support](https://atmyapp.com/support)**
 
-    // Handle increment button click
-    document.getElementById("increment-btn").addEventListener("click", () => {
-      // Send event to React
-      window.dispatchEvent(
-        new CustomEvent("component:action", {
-          detail: {
-            action: "increment",
-            timestamp: Date.now(),
-          },
-          bubbles: true,
-        })
-      );
+Made with ❤️ by the AtMyApp team
 
-      logEvent("Increment requested");
-    });
+_Build React apps with AtMyApp._
 
-    // Handle reset button click
-    document.getElementById("reset-btn").addEventListener("click", () => {
-      // Send event to React
-      window.dispatchEvent(
-        new CustomEvent("component:action", {
-          detail: {
-            action: "reset",
-            timestamp: Date.now(),
-          },
-          bubbles: true,
-        })
-      );
-
-      logEvent("Reset requested");
-    });
-
-    // Listen for React events
-    window.addEventListener("react:stateUpdate", (event) => {
-      counterValue = event.detail.count;
-      document.getElementById("count-display").textContent = counterValue;
-      logEvent(`Updated from React: ${counterValue}`);
-    });
-
-    // Log initial load
-    logEvent("Component initialized");
-  </script>
-
-  <style>
-    .counter-widget {
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      padding: 16px;
-      margin: 16px 0;
-      font-family: system-ui, sans-serif;
-    }
-
-    .buttons {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 16px;
-    }
-
-    .event-log {
-      background-color: #f5f5f5;
-      border-radius: 4px;
-      padding: 8px;
-      font-size: 12px;
-      max-height: 150px;
-      overflow-y: auto;
-    }
-  </style>
 </div>
-```
-
-## Utility Functions
-
-### Content and Image URLs
-
-```tsx
-import { createAmaUrl } from "@atmyapp/react-package";
-
-// Generate a full URL to an AtMyApp resource
-const imageUrl = createAmaUrl("https://project.atmyapp.com", "images/logo.png");
-// => 'https://project.atmyapp.com/images/logo.png'
-```
-
-### HTML Sanitization
-
-```tsx
-import { sanitizeHtml } from "@atmyapp/react-package";
-
-// Sanitize potentially unsafe HTML
-const userHtml = '<div>User content <script>alert("XSS")</script></div>';
-const safeHtml = sanitizeHtml(userHtml);
-// => '<div>User content </div>' (script tag removed)
-
-// Customize allowed tags
-const customSanitized = sanitizeHtml(
-  '<div><h1>Title</h1><iframe src="..."></iframe></div>',
-  ["div", "h1", "p", "a", "strong", "em"]
-);
-// => '<div><h1>Title</h1></div>' (iframe removed)
-```
-
-### Component Interoperability
-
-```tsx
-import {
-  injectComponentData,
-  listenToComponentEvent,
-  sendToComponent,
-} from "@atmyapp/react-package";
-
-// Create data attributes for components
-const attributes = injectComponentData({
-  userId: 123,
-  theme: "dark",
-  isAdmin: true,
-});
-// => { 'data-ama-userId': '123', 'data-ama-theme': 'dark', 'data-ama-isAdmin': 'true' }
-
-// Listen for events from HTML components
-const cleanup = listenToComponentEvent("component:buttonClick", (data) => {
-  console.log("Button clicked:", data);
-});
-
-// Send data to HTML components
-sendToComponent("react:themeChange", { theme: "light" });
-```
-
-## Configuration Options
-
-### `AmaImageConfig`
-
-Options for image optimization and handling:
-
-```typescript
-interface AmaImageConfig {
-  // Format optimization: webp or none
-  optimizeFormat?: "webp" | "none";
-
-  // Progressive loading: progressive or none
-  optimizeLoad?: "progressive" | "none";
-
-  // Aspect ratio hint for cropping/resizing
-  ratioHint?: {
-    x: number;
-    y: number;
-  };
-
-  // Maximum dimensions for the image
-  maxSize?: {
-    width: number;
-    height: number;
-  };
-}
-```
-
-### `AmaComponentConfig`
-
-Options for HTML component handling:
-
-```typescript
-interface AmaComponentConfig {
-  // Whether to sanitize HTML (default: true)
-  sanitize?: boolean;
-
-  // Allowed HTML tags when sanitizing
-  allowedTags?: string[];
-
-  // Cache duration in seconds (default: 3600)
-  cacheDuration?: number;
-}
-```
-
-### `AmaFileConfig`
-
-Options for file handling:
-
-```typescript
-interface AmaFileConfig {
-  // Override content type for the file
-  contentType?: string;
-
-  // Cache duration in seconds (default: 3600)
-  cacheDuration?: number;
-}
-```
-
-### `AtMyAppConfig`
-
-Options for direct configuration approach:
-
-```typescript
-interface AtMyAppConfig {
-  // API key for authentication
-  apiKey: string;
-
-  // Base URL for the AtMyApp project
-  projectUrl: string;
-
-  // Optional cache duration in seconds (default: 3600)
-  defaultCacheDuration?: number;
-}
-```
-
-## Security Considerations
-
-### HTML Components
-
-- By default, all HTML components are sanitized to remove potentially dangerous elements
-- For trusted sources, you can disable sanitization with `sanitize: false`
-- When sanitization is enabled, only a safe subset of HTML tags are allowed
-- You can customize allowed tags with the `allowedTags` option
-- Scripts in components will only run if sanitization is disabled
-
-### Content Security
-
-- All API requests are authenticated with your API key
-- Content is cached for improved performance and reduced API calls
-- TypeScript definitions ensure type safety for your content structures
-
-## Advanced Usage
-
-### Custom Caching Strategy
-
-You can customize the caching behavior for different resources:
-
-```tsx
-// With Provider
-<AmaProvider
-  apiKey="your-api-key"
-  projectUrl="https://your-project.atmyapp.com"
-  defaultCacheDuration={1800} // 30 minutes default cache
->
-  <YourApp />
-</AmaProvider>;
-
-// Or with direct configuration
-const atmyapp = createAtMyApp({
-  apiKey: "your-api-key",
-  projectUrl: "https://your-project.atmyapp.com",
-  defaultCacheDuration: 1800, // 30 minutes default cache
-});
-```
-
-### Mixing Provider and Direct Configuration
-
-You can mix both approaches in the same application:
-
-```tsx
-// Component within provider but using explicit config
-function SpecialCaseComponent() {
-  // This uses a different configuration than the provider
-  const specialConfig = createAtMyApp({
-    apiKey: "special-api-key",
-    projectUrl: "https://special-project.atmyapp.com",
-  });
-
-  const { data } = useAmaContent("special/content.json", specialConfig);
-
-  return <div>{/* ... */}</div>;
-}
-```
-
-### Combining Multiple Resource Types
-
-Example using multiple AtMyApp resource types together:
-
-```tsx
-import {
-  useAmaContent,
-  useAmaImage,
-  AmaComponentRenderer,
-} from "@atmyapp/react-package";
-import { ProductContent, ProductImage, ReviewsComponent } from "./types";
-
-function ProductPage({ productId }) {
-  // Fetch product details
-  const { data: product, isLoading: loadingProduct } =
-    useAmaContent<ProductContent>(`products/${productId}/data.json`);
-
-  // Load product image
-  const { src: imageSrc, isLoading: loadingImage } = useAmaImage<ProductImage>(
-    `products/${productId}/image.jpg`
-  );
-
-  if (loadingProduct || loadingImage) {
-    return <div>Loading product...</div>;
-  }
-
-  return (
-    <div className="product-page">
-      <h1>{product.name}</h1>
-      <img src={imageSrc} alt={product.name} />
-      <p>{product.description}</p>
-      <div className="price">${product.price.toFixed(2)}</div>
-
-      {/* Embedded reviews component */}
-      <h2>Customer Reviews</h2>
-      <AmaComponentRenderer
-        path={`products/${productId}/reviews.html`}
-        config={{ cacheDuration: 300 }} // 5 minutes cache
-      />
-    </div>
-  );
-}
-```
-
-## CLI Tools
-
-AtMyApp comes with CLI tools to simplify project setup and type management:
-
-### Installation
-
-The CLI is included with the package and can be used via npx:
-
-```bash
-npx ama [command]
-```
-
-Or add scripts to your package.json:
-
-```json
-{
-  "scripts": {
-    "ama:use": "ama use",
-    "ama:migrate": "ama migrate"
-  }
-}
-```
-
-### Authentication
-
-Set up authentication with the `use` command:
-
-```bash
-npx ama use
-```
-
-This interactive command will:
-
-1. Prompt for your project URL and authentication token
-2. Save the configuration in `.ama/session.json`
-3. Add the session file to `.gitignore` for security
-
-You can also provide arguments directly:
-
-```bash
-npx ama use --url https://your-project.atmyapp.com --token your-token
-```
-
-### Type Migration
-
-The `migrate` command analyzes your TypeScript files and extracts AMA type definitions:
-
-```bash
-npx ama migrate
-```
-
-Options:
-
-- `--dry-run`: Show what would be migrated without making changes
-- `--verbose`: Show detailed logs during migration
-- `--tsconfig <path>`: Specify a custom tsconfig.json path
-- `--continue-on-error`: Continue processing even when errors are encountered
-
-Example:
-
-```bash
-npx ama migrate --verbose --tsconfig ./tsconfig.build.json
-```
-
-This command:
-
-1. Scans your TypeScript files for AMA type references
-2. Extracts the type information
-3. Generates proper schema definitions
-4. Creates or updates type definitions in your project
-
-## TypeScript Support
-
-This package is written in TypeScript and provides full type safety. It requires:
-
-- TypeScript 4.1+
-- ES2015 target or higher
-- DOM library
-
-## License
-
-MIT

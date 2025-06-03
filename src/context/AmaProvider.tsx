@@ -5,11 +5,15 @@ import React, {
   useEffect,
   useMemo,
 } from "react";
+import {
+  createAtMyAppClient,
+  AtMyAppClient,
+  AtMyAppClientOptions,
+} from "@atmyapp/core";
 
 type AmaContextType = {
-  apiKey: string;
-  projectUrl: string;
-  cache: Map<string, any>;
+  client: AtMyAppClient;
+  options: AtMyAppClientOptions;
 };
 
 const AmaContext = createContext<AmaContextType | null>(null);
@@ -17,18 +21,23 @@ const AmaContext = createContext<AmaContextType | null>(null);
 export const AmaProvider: React.FC<{
   children: React.ReactNode;
   apiKey: string;
-  projectUrl: string;
-}> = ({ children, apiKey, projectUrl }) => {
-  const [cache] = useState(() => new Map<string, any>());
-
-  const value = useMemo(
-    () => ({
+  baseUrl: string;
+  previewKey?: string;
+}> = ({ children, apiKey, baseUrl, previewKey }) => {
+  const value = useMemo(() => {
+    const options: AtMyAppClientOptions = {
       apiKey,
-      projectUrl,
-      cache,
-    }),
-    [apiKey, projectUrl, cache]
-  );
+      baseUrl,
+      previewKey,
+    };
+
+    const client = createAtMyAppClient(options);
+
+    return {
+      client,
+      options,
+    };
+  }, [apiKey, baseUrl, previewKey]);
 
   return <AmaContext.Provider value={value}>{children}</AmaContext.Provider>;
 };

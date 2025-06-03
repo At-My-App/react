@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
 import { useAmaContext } from "../context/AmaProvider";
-import { AmaImageRef } from "../types/AmaImage";
-import { amaFetch, createAmaUrl } from "../utils/amaFetch";
+import { AmaImageDef, AtMyAppClient } from "@atmyapp/core";
 
 /**
  * Hook return type
  */
 interface AmaImageHook {
-  /** The image src as preloaded image (not path) */
+  /** The image src URL */
   src: string;
   /** True while data is being fetched */
   isLoading: boolean;
@@ -15,40 +14,27 @@ interface AmaImageHook {
   error: Error | null;
 }
 
-// Cache store for already loaded images
-const imageCache = new Map<string, string>();
-
 /**
- * Custom hook to fetch and load an image from the CMS
+ * Custom hook to fetch and load an image from the CMS using the core library
  *
+ * @template T - Image type definition
  * @param path - The image path
- * @param atmyAppConfig - Optional configuration object from createAtMyApp
+ * @param client - Optional AtMyApp client instance from createAtMyApp
  * @returns Object containing the image src, loading state, and errors
  */
-export function useAmaImage<C extends AmaImageRef<any, any>>(
-  path: C["path"],
-  atmyAppConfig?: ReturnType<typeof import("../createAtMyApp").createAtMyApp>
+export function useAmaImage<T extends AmaImageDef<string, any>>(
+  path: T["path"],
+  client?: AtMyAppClient
 ): AmaImageHook {
-  // Use provided config or get from context
-  let config: {
-    apiKey: string;
-    projectUrl: string;
-    cache: Map<string, any>;
-  };
+  // Use provided client or get from context
+  const context = !client ? useAmaContext() : null;
+  const amaClient = client || context?.client;
 
-  if (atmyAppConfig) {
-    config = atmyAppConfig;
-  } else {
-    const context = useAmaContext();
-    if (!context) {
-      throw new Error(
-        "useAmaImage must be used within an AmaProvider or provide a configuration"
-      );
-    }
-    config = context;
+  if (!amaClient) {
+    throw new Error(
+      "useAmaImage must be used within an AmaProvider or provide a client instance"
+    );
   }
-
-  const { apiKey, projectUrl, cache } = config;
 
   const [src, setSrc] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -61,49 +47,18 @@ export function useAmaImage<C extends AmaImageRef<any, any>>(
         return;
       }
 
-      // Create cache key
-      const cacheKey = `image:${path}`;
-
       try {
-        // Check if the image URL is in the context cache
-        if (cache.has(cacheKey)) {
-          setSrc(cache.get(cacheKey) as string);
-          setIsLoading(false);
-          return;
-        }
-
-        // Check the local imageCache as well
-        if (imageCache.has(cacheKey)) {
-          setSrc(imageCache.get(cacheKey) as string);
-          setIsLoading(false);
-          // Still update the main cache for future references
-          cache.set(cacheKey, imageCache.get(cacheKey));
-          return;
-        }
-
-        // Construct the full URL
-        const url = createAmaUrl(projectUrl, path);
-
         setIsLoading(true);
         setError(null);
 
-        // For images, we'll create a blob URL from the fetched data
-        const arrayBufferData = await amaFetch<Blob>(url, {
-          apiKey,
-          responseType: "arraybuffer",
-        });
+        // Use the core client's collections API
+        const result = await amaClient.collections.get(path, "image");
 
-        // convert from array buffer to blob
-        const blobData = new Blob([arrayBufferData]);
+        if (result.isError) {
+          throw new Error(result.errorMessage || "Failed to fetch image");
+        }
 
-        // Create an object URL from the blob
-        const imageUrl = URL.createObjectURL(blobData);
-
-        // Store in both caches
-        cache.set(cacheKey, imageUrl);
-        imageCache.set(cacheKey, imageUrl);
-
-        setSrc(imageUrl);
+        setSrc(result.src);
         setIsLoading(false);
       } catch (err) {
         console.error("Error fetching image:", err);
@@ -113,14 +68,16 @@ export function useAmaImage<C extends AmaImageRef<any, any>>(
     };
 
     fetchImage();
+  }, [path, amaClient]);
 
-    // Cleanup function to revoke object URLs when component unmounts
+  // Separate effect for cleanup to capture the current src value
+  useEffect(() => {
     return () => {
       if (src && src.startsWith("blob:")) {
         URL.revokeObjectURL(src);
       }
     };
-  }, [path, apiKey, projectUrl, cache]);
+  }, [src]);
 
   return { src, isLoading, error };
 }

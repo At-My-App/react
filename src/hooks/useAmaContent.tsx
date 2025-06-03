@@ -1,17 +1,13 @@
 import { useState, useEffect } from "react";
 import { useAmaContext } from "../context/AmaProvider";
-import { AmaContentRef } from "../types/AmaContent";
-import { amaFetch, createAmaUrl } from "../utils/amaFetch";
-
-// Cache store for content data
-const contentCache = new Map<string, unknown>();
+import { AmaContentDef, AtMyAppClient } from "@atmyapp/core";
 
 /**
  * Hook return type
  */
-interface AmaContentHook<T extends AmaContentRef<string, unknown>> {
+interface AmaContentHook<T> {
   /** The parsed content data matching the structure definition */
-  data: T extends AmaContentRef<infer P, infer D> ? D : never;
+  data: T | null;
   /** True while data is being fetched */
   isLoading: boolean;
   /** Error object if data fetching fails */
@@ -19,40 +15,28 @@ interface AmaContentHook<T extends AmaContentRef<string, unknown>> {
 }
 
 /**
- * Custom hook to fetch JSON content from the CMS
+ * Custom hook to fetch JSON content from the CMS using the core library
  *
- * @template T - Content reference type
+ * @template T - Content type definition
  * @param path - The content path
- * @param atmyAppConfig - Optional configuration object from createAtMyApp
+ * @param client - Optional AtMyApp client instance from createAtMyApp
  * @returns Object containing the parsed content data, loading state, and errors
  */
-export function useAmaContent<T extends AmaContentRef<string, unknown>>(
+export function useAmaContent<T extends AmaContentDef<string, any>>(
   path: T["path"],
-  atmyAppConfig?: ReturnType<typeof import("../createAtMyApp").createAtMyApp>
-): AmaContentHook<T> {
-  // Use provided config or get from context
-  let config: {
-    apiKey: string;
-    projectUrl: string;
-    cache: Map<string, any>;
-  };
+  client?: AtMyAppClient
+): AmaContentHook<T["structure"]> {
+  // Use provided client or get from context
+  const context = !client ? useAmaContext() : null;
+  const amaClient = client || context?.client;
 
-  if (atmyAppConfig) {
-    config = atmyAppConfig;
-  } else {
-    const context = useAmaContext();
-    if (!context) {
-      throw new Error(
-        "useAmaContent must be used within an AmaProvider or provide a configuration"
-      );
-    }
-    config = context;
+  if (!amaClient) {
+    throw new Error(
+      "useAmaContent must be used within an AmaProvider or provide a client instance"
+    );
   }
 
-  const { apiKey, projectUrl, cache } = config;
-
-  // Using unknown type for data since it will be cast to the correct type in the return
-  const [data, setData] = useState<unknown>(null);
+  const [data, setData] = useState<T["structure"] | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -63,43 +47,18 @@ export function useAmaContent<T extends AmaContentRef<string, unknown>>(
         return;
       }
 
-      // Create cache key
-      const cacheKey = `content:${path}`;
-
       try {
-        // Check if the content is in the context cache
-        if (cache.has(cacheKey)) {
-          setData(cache.get(cacheKey));
-          setIsLoading(false);
-          return;
-        }
-
-        // Check the local contentCache as well
-        if (contentCache.has(cacheKey)) {
-          setData(contentCache.get(cacheKey));
-          setIsLoading(false);
-          // Still update the main cache for future references
-          cache.set(cacheKey, contentCache.get(cacheKey));
-          return;
-        }
-
-        // Construct the full URL
-        const url = createAmaUrl(projectUrl, path);
-
         setIsLoading(true);
         setError(null);
 
-        // Fetch the content as JSON
-        const contentData = await amaFetch<unknown>(url, {
-          apiKey,
-          responseType: "json",
-        });
+        // Use the core client's collections API
+        const result = await amaClient.collections.get(path, "content");
 
-        // Store in both caches
-        cache.set(cacheKey, contentData);
-        contentCache.set(cacheKey, contentData);
+        if (result.isError) {
+          throw new Error(result.errorMessage || "Failed to fetch content");
+        }
 
-        setData(contentData);
+        setData(result.data);
         setIsLoading(false);
       } catch (err) {
         console.error("Error fetching content:", err);
@@ -109,11 +68,10 @@ export function useAmaContent<T extends AmaContentRef<string, unknown>>(
     };
 
     fetchContent();
-  }, [path, apiKey, projectUrl, cache]);
+  }, [path, amaClient]);
 
-  // Cast the data to the correct type based on the content reference
   return {
-    data: data as T extends AmaContentRef<infer P, infer D> ? D : never,
+    data,
     isLoading,
     error,
   };
