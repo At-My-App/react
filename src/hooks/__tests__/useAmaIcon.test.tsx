@@ -1,7 +1,7 @@
 import React from "react";
 import { renderHook, waitFor } from "@testing-library/react";
 import { createAtMyAppClient } from "@atmyapp/core";
-import { useAmaFile } from "../useAmaFile";
+import { useAmaIcon } from "../useAmaIcon";
 import { AmaProvider } from "../../context/AmaProvider";
 import { ReactNode } from "react";
 
@@ -10,7 +10,7 @@ jest.mock("@atmyapp/core");
 
 const mockCreateAtMyAppClient = createAtMyAppClient as jest.Mock;
 
-describe("useAmaFile", () => {
+describe("useAmaIcon", () => {
   const mockClient = {
     collections: {
       get: jest.fn(),
@@ -33,14 +33,14 @@ describe("useAmaFile", () => {
     </AmaProvider>
   );
 
-  it("should fetch file successfully", async () => {
-    const mockSrc = "https://test.atmyapp.com/files/document.pdf";
+  it("should fetch icon successfully", async () => {
+    const mockSrc = "https://test.atmyapp.com/icons/menu.svg";
     mockClient.collections.get.mockResolvedValue({
       isError: false,
       src: mockSrc,
     });
 
-    const { result } = renderHook(() => useAmaFile("/files/document"), {
+    const { result } = renderHook(() => useAmaIcon("/icons/menu"), {
       wrapper,
     });
 
@@ -55,19 +55,19 @@ describe("useAmaFile", () => {
     expect(result.current.src).toBe(mockSrc);
     expect(result.current.error).toBe(null);
     expect(mockClient.collections.get).toHaveBeenCalledWith(
-      "/files/document",
-      "file"
+      "/icons/menu",
+      "icon"
     );
   });
 
   it("should handle errors", async () => {
-    const errorMessage = "File not found";
+    const errorMessage = "Icon not found";
     mockClient.collections.get.mockResolvedValue({
       isError: true,
       errorMessage,
     });
 
-    const { result } = renderHook(() => useAmaFile("/files/error"), {
+    const { result } = renderHook(() => useAmaIcon("/icons/error"), {
       wrapper,
     });
 
@@ -81,14 +81,14 @@ describe("useAmaFile", () => {
   });
 
   it("should work with client instance", async () => {
-    const mockSrc = "https://test.atmyapp.com/files/direct.pdf";
+    const mockSrc = "https://test.atmyapp.com/icons/direct.svg";
     mockClient.collections.get.mockResolvedValue({
       isError: false,
       src: mockSrc,
     });
 
     const { result } = renderHook(() =>
-      useAmaFile("/files/direct", mockClient as any)
+      useAmaIcon("/icons/direct", mockClient as any)
     );
 
     await waitFor(() => {
@@ -100,7 +100,7 @@ describe("useAmaFile", () => {
   });
 
   it("should handle no client gracefully", () => {
-    const { result } = renderHook(() => useAmaFile("/files/no-client"));
+    const { result } = renderHook(() => useAmaIcon("/icons/no-client"));
 
     expect(result.current.isLoading).toBe(false);
     expect(result.current.src).toBe("");
@@ -111,7 +111,7 @@ describe("useAmaFile", () => {
   });
 
   it("should handle empty path", async () => {
-    const { result } = renderHook(() => useAmaFile(""), { wrapper });
+    const { result } = renderHook(() => useAmaIcon(""), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);

@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { useAmaContextSafe } from "../context/AmaProvider";
-import { AmaContentDef, AtMyAppClient } from "@atmyapp/core";
+import { AmaIconDef, AtMyAppClient } from "@atmyapp/core";
 
 /**
  * Hook return type
  */
-interface AmaContentHook<T> {
-  /** The parsed content data matching the structure definition */
-  data: T | null;
+interface AmaIconHook {
+  /** The icon src URL */
+  src: string;
   /** True while data is being fetched */
   isLoading: boolean;
   /** Error object if data fetching fails */
@@ -15,28 +15,28 @@ interface AmaContentHook<T> {
 }
 
 /**
- * Custom hook to fetch JSON content from the CMS using the core library
+ * Custom hook to fetch an icon from the CMS using the core library
  *
- * @template T - Content type definition
- * @param path - The content path
+ * @template T - Icon type definition
+ * @param path - The icon path
  * @param client - Optional AtMyApp client instance from createAtMyApp
- * @returns Object containing the parsed content data, loading state, and errors
+ * @returns Object containing the icon src, loading state, and errors
  */
-export function useAmaContent<T extends AmaContentDef<string, any>>(
+export function useAmaIcon<T extends AmaIconDef<string>>(
   path: T["path"],
   client?: AtMyAppClient
-): AmaContentHook<T["structure"]> {
+): AmaIconHook {
   // Use provided client or get from context with safer error handling
   const context = !client ? useAmaContextSafe() : null;
   const contextError = context?.error || null;
   const amaClient = client || context?.client || null;
 
-  const [data, setData] = useState<T["structure"] | null>(null);
+  const [src, setSrc] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const fetchContent = async () => {
+    const fetchIcon = async () => {
       // Handle context errors
       if (contextError) {
         setError(contextError);
@@ -52,7 +52,7 @@ export function useAmaContent<T extends AmaContentDef<string, any>>(
 
       if (!path) {
         setIsLoading(false);
-        setData(null);
+        setSrc("");
         setError(null);
         return;
       }
@@ -62,29 +62,28 @@ export function useAmaContent<T extends AmaContentDef<string, any>>(
         setError(null);
 
         // Use the core client's collections API
-        const result = await amaClient.collections.get(path, "content");
+        const result = await amaClient.collections.get<AmaIconDef<string>>(
+          path,
+          "icon"
+        );
 
         if (result.isError) {
-          throw new Error(result.errorMessage || "Failed to fetch content");
+          throw new Error(result.errorMessage || "Failed to fetch icon");
         }
 
-        setData(result.data);
+        setSrc(result.src);
         setIsLoading(false);
       } catch (err) {
-        console.error("Error fetching content:", err);
+        console.error("Error fetching icon:", err);
         const errorObj = err instanceof Error ? err : new Error(String(err));
         setError(errorObj);
         setIsLoading(false);
-        setData(null);
+        setSrc("");
       }
     };
 
-    fetchContent();
+    fetchIcon();
   }, [path, amaClient, contextError]);
 
-  return {
-    data,
-    isLoading,
-    error,
-  };
+  return { src, isLoading, error };
 }

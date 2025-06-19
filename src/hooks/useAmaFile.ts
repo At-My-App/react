@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAmaContext } from "../context/AmaProvider";
+import { useAmaContextSafe } from "../context/AmaProvider";
 import { AmaFileDef, AtMyAppClient } from "@atmyapp/core";
 
 /**
@@ -26,15 +26,10 @@ export function useAmaFile<T extends AmaFileDef<string, any>>(
   path: T["path"],
   client?: AtMyAppClient
 ): AmaFileHook {
-  // Use provided client or get from context
-  const context = !client ? useAmaContext() : null;
-  const amaClient = client || context?.client;
-
-  if (!amaClient) {
-    throw new Error(
-      "useAmaFile must be used within an AmaProvider or provide a client instance"
-    );
-  }
+  // Use provided client or get from context with safer error handling
+  const context = !client ? useAmaContextSafe() : null;
+  const contextError = context?.error || null;
+  const amaClient = client || context?.client || null;
 
   const [src, setSrc] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -42,8 +37,23 @@ export function useAmaFile<T extends AmaFileDef<string, any>>(
 
   useEffect(() => {
     const fetchFile = async () => {
+      // Handle context errors
+      if (contextError) {
+        setError(contextError);
+        setIsLoading(false);
+        return;
+      }
+
+      if (!amaClient) {
+        setError(new Error("AtMyApp client is not available"));
+        setIsLoading(false);
+        return;
+      }
+
       if (!path) {
         setIsLoading(false);
+        setSrc("");
+        setError(null);
         return;
       }
 
@@ -62,13 +72,15 @@ export function useAmaFile<T extends AmaFileDef<string, any>>(
         setIsLoading(false);
       } catch (err) {
         console.error("Error fetching file:", err);
-        setError(err instanceof Error ? err : new Error(String(err)));
+        const errorObj = err instanceof Error ? err : new Error(String(err));
+        setError(errorObj);
         setIsLoading(false);
+        setSrc("");
       }
     };
 
     fetchFile();
-  }, [path, amaClient]);
+  }, [path, amaClient, contextError]);
 
   return { src, isLoading, error };
 }

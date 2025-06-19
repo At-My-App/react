@@ -28,7 +28,7 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
-    "@atmyapp/core": "0.0.4"
+    "@atmyapp/core": "^0.0.6"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.0",

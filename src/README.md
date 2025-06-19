@@ -34,6 +34,27 @@ interface AmaFileHook {
 }
 ```
 
+### useAmaIcon
+
+#### Hook
+
+```typescript
+export function useAmaIcon<T extends AmaIconDef<string>>(
+  path: T["path"],
+  client?: AtMyAppClient
+): AmaIconHook;
+```
+
+#### Hook return type
+
+```typescript
+interface AmaIconHook {
+  src: string; // Icon URL
+  isLoading: boolean; // True while data is being fetched
+  error: Error | null; // Error object if data fetching fails
+}
+```
+
 ### useAmaContent
 
 ```typescript

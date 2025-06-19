@@ -119,10 +119,14 @@ describe("useAmaAnalytics", () => {
     );
   });
 
-  it("should throw error when no client available", () => {
-    expect(() => {
-      renderHook(() => useAmaAnalytics());
-    }).toThrow("useAmaContext must be used within an AmaProvider");
+  it("should handle no client gracefully", () => {
+    const { result } = renderHook(() => useAmaAnalytics());
+
+    expect(result.current.error).toBeInstanceOf(Error);
+    expect(result.current.isAvailable).toBe(false);
+    expect(result.current.error?.message).toBe(
+      "useAmaContext must be used within an AmaProvider"
+    );
   });
 
   it("should track custom events with array data", async () => {

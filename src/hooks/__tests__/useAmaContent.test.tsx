@@ -99,10 +99,15 @@ describe("useAmaContent", () => {
     expect(result.current.error).toBe(null);
   });
 
-  it("should throw error when no client available", () => {
-    expect(() => {
-      renderHook(() => useAmaContent("/test/no-client"));
-    }).toThrow("useAmaContext must be used within an AmaProvider");
+  it("should handle no client gracefully", () => {
+    const { result } = renderHook(() => useAmaContent("/test/no-client"));
+
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.data).toBe(null);
+    expect(result.current.error).toBeInstanceOf(Error);
+    expect(result.current.error?.message).toBe(
+      "AtMyApp client is not available"
+    );
   });
 
   it("should handle empty path", async () => {
